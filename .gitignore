@@ -1,0 +1,13 @@
+node_modules/
+frontend/node_modules/
+backend/venv/
+backend/__pycache__/
+*.pyc
+backend/clarivox.db
+backend/uploads/
+frontend/.env
+backend/.env
+frontend/dist/
+.DS_Store
+*.so
+*.dylib
