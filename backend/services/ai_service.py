@@ -77,7 +77,6 @@ def summarize_text(text: str, max_length: int = 150) -> str:
     if not text or len(text.strip()) < 30:
         return "Transcript too short to summarize."
 
-    # Truncate for speed — distilbart handles up to 1024 tokens (~4000 chars)
     text = text[:4000]
 
     try:
@@ -95,33 +94,26 @@ def summarize_text(text: str, max_length: int = 150) -> str:
         sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 20]
         return '. '.join(sentences[:3]) + '.' if sentences else text[:300]
 
-# ── Keyword extraction ────────────────────────────────────────────────────────
+# ── Keyword extraction (no spacy — pure Python) ───────────────────────────────
 def extract_keywords(text: str) -> list:
-    try:
-        import spacy
-        nlp = spacy.load("en_core_web_sm")
-        doc = nlp(text[:5000])
-        keywords = list({
-            chunk.text.lower() for chunk in doc.noun_chunks
-            if len(chunk.text) > 3 and chunk.root.pos_ in {"NOUN", "PROPN"}
-        })
-        return keywords[:15]
-    except Exception:
-        # Fallback: word frequency without spaCy
-        words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
-        stopwords = {
-            'that','this','with','from','they','have','been','were','will',
-            'would','could','should','their','there','about','which','when',
-            'what','your','into','more','also','than','then','just','like',
-            'some','only','other','after','over','such','very','most','both',
-            'through','during','before','between','each','many','those',
-            'these','same','under','while','does','doing','where'
-        }
-        freq = {}
-        for w in words:
-            if w not in stopwords:
-                freq[w] = freq.get(w, 0) + 1
-        return [w for w, _ in sorted(freq.items(), key=lambda x: -x[1])[:15]]
+    words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
+    stopwords = {
+        'that','this','with','from','they','have','been','were','will',
+        'would','could','should','their','there','about','which','when',
+        'what','your','into','more','also','than','then','just','like',
+        'some','only','other','after','over','such','very','most','both',
+        'through','during','before','between','each','many','those',
+        'these','same','under','while','does','doing','where','here',
+        'said','says','going','come','came','make','made','take','took',
+        'know','think','look','want','give','find','tell','work','call',
+        'back','good','well','even','much','long','down','time','year',
+        'people','right','used','high','every','need','large','often'
+    }
+    freq = {}
+    for w in words:
+        if w not in stopwords:
+            freq[w] = freq.get(w, 0) + 1
+    return [w for w, _ in sorted(freq.items(), key=lambda x: -x[1])[:15]]
 
 # ── Action item extraction ────────────────────────────────────────────────────
 def extract_action_items(text: str) -> list:
@@ -164,13 +156,11 @@ def analyze_sentiment(text: str) -> str:
 def process_meeting(file_path: str, language: Optional[str] = None) -> dict:
     t0 = time.time()
 
-    # Step 1 — Transcribe
     print(f"[Clarivox] Transcribing: {file_path}")
     transcript_data = transcribe_audio(file_path, language)
     full_text       = transcript_data["full_text"]
     print(f"[Clarivox] Transcription done in {time.time()-t0:.1f}s — {len(full_text)} chars")
 
-    # No speech detected
     if not full_text.strip():
         return {
             "transcript": transcript_data,
@@ -184,7 +174,6 @@ def process_meeting(file_path: str, language: Optional[str] = None) -> dict:
             }
         }
 
-    # Step 2 — Run all analysis in parallel (saves 60–70% time)
     t1 = time.time()
     print("[Clarivox] Running analysis in parallel...")
 
